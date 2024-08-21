@@ -1,4 +1,4 @@
-module github.com/apache/openserverless-runtimes
+module github.com/giusdp/openserverless-runtimes
 
 go 1.21.4
 
