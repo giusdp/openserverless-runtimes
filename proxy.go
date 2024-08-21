@@ -22,6 +22,7 @@ import (
 	"log"
 	"os"
 	"runtime"
+
 	"github.com/apache/openserverless-runtimes/openwhisk"
 )
 
@@ -49,7 +50,7 @@ func main() {
 
 	// show version number
 	if *version {
-		fmt.Printf("OpenWhisk ActionLoop Proxy v%s, built with %s\n", openwhisk.Version, runtime.Version())
+		fmt.Printf("OpenWhisk ActionLoop Proxy (VastAI Enabled) v%s, built with %s\n", openwhisk.Version, runtime.Version())
 		return
 	}
 

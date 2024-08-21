@@ -114,6 +114,12 @@ func (ap *ActionProxy) initHandler(w http.ResponseWriter, r *http.Request) {
 		buf = []byte(request.Value.Code)
 	}
 
+	// ** Vast AI
+
+	DoSomething()
+
+	// **
+
 	// if a compiler is defined try to compile
 	_, err = ap.ExtractAndCompile(&buf, main)
 	if err != nil {
