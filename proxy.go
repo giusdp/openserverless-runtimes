@@ -23,7 +23,7 @@ import (
 	"os"
 	"runtime"
 
-	"github.com/apache/openserverless-runtimes/openwhisk"
+	"github.com/giusdp/openserverless-runtimes/openwhisk"
 )
 
 // flag to show version
