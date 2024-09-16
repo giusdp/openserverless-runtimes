@@ -55,15 +55,15 @@ func (ap *ActionProxy) runHandler(w http.ResponseWriter, r *http.Request) {
 	Debug("done reading %d bytes", len(body))
 
 	// check if you have an action
-	if ap.theExecutor == nil {
-		sendError(w, http.StatusInternalServerError, fmt.Sprintf("no action defined yet"))
-		return
-	}
-	// check if the process exited
-	if ap.theExecutor.Exited() {
-		sendError(w, http.StatusInternalServerError, fmt.Sprintf("command exited"))
-		return
-	}
+	// if ap.theExecutor == nil {
+	// 	sendError(w, http.StatusInternalServerError, fmt.Sprintf("no action defined yet"))
+	// 	return
+	// }
+	// // check if the process exited
+	// if ap.theExecutor.Exited() {
+	// 	sendError(w, http.StatusInternalServerError, fmt.Sprintf("command exited"))
+	// 	return
+	// }
 
 	// remove newlines
 	body = bytes.Replace(body, []byte("\n"), []byte(""), -1)
@@ -71,13 +71,46 @@ func (ap *ActionProxy) runHandler(w http.ResponseWriter, r *http.Request) {
 	// execute the action
 	response, err := ap.theExecutor.Interact(body)
 
-	// check for early termination
+	sshUrl := ap.env["VASTAI_SSH_URL"]
+	vastai_ssh_key := ap.env["OPS_VASTAI_SSH_KEY"]
+	sshClient, err := ConnectSSH(sshUrl, vastai_ssh_key)
 	if err != nil {
-		Debug("WARNING! Command exited")
-		ap.theExecutor = nil
-		sendError(w, http.StatusBadRequest, fmt.Sprintf("command exited"))
+		sendError(w, http.StatusBadGateway, "Error connecting to Vast.ai. Check logs for details.")
 		return
 	}
+
+	session, err := sshClient.NewSession()
+	if err != nil {
+		Debug("Error creating session to Vast.ai instance: %v", err)
+		sendError(w, http.StatusBadGateway, "Error creating session to Vast.ai instance. Check logs for details.")
+		return
+	}
+	defer session.Close()
+
+	var outBuffer bytes.Buffer
+	session.Stdout = &outBuffer
+
+	var errBuffer bytes.Buffer
+	session.Stderr = &errBuffer
+
+	Debug("running action in vast ai with body: %s", string(body))
+
+	// in the instance, the action is in /action and we should run the __main__.py
+	err = session.Run(fmt.Sprintf("cd /action && python3 main__.py '%s'", string(body)))
+	if errBuffer.Len() > 0 {
+		Debug("Error running action in Vast.ai instance: %v", errBuffer.String())
+	}
+	if err != nil {
+		Debug("Error running action in Vast.ai instance: %v", err)
+		// check for early termination
+		Debug("WARNING! Command exited")
+		ap.theExecutor = nil
+		sendError(w, http.StatusBadRequest, "command exited")
+		return
+	}
+
+	// response := outBuffer.Bytes()
+
 	DebugLimit("received:", response, 120)
 
 	// check if the answer is an object map

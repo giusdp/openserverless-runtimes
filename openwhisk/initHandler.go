@@ -114,14 +114,8 @@ func (ap *ActionProxy) initHandler(w http.ResponseWriter, r *http.Request) {
 		buf = []byte(request.Value.Code)
 	}
 
-	// ** Vast AI
-
-	DoSomething()
-
-	// **
-
 	// if a compiler is defined try to compile
-	_, err = ap.ExtractAndCompile(&buf, main)
+	binPath, err := ap.ExtractAndCompile(&buf, main)
 	if err != nil {
 		if os.Getenv("OW_LOG_INIT_ERROR") == "" {
 			sendError(w, http.StatusBadGateway, err.Error())
@@ -134,19 +128,75 @@ func (ap *ActionProxy) initHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// start an action
-	err = ap.StartLatestAction()
-	if err != nil {
-		if os.Getenv("OW_LOG_INIT_ERROR") == "" {
-			sendError(w, http.StatusBadGateway, "cannot start action: "+err.Error())
-		} else {
-			ap.errFile.Write([]byte(err.Error() + "\n"))
-			ap.outFile.Write([]byte(OutputGuard))
-			ap.errFile.Write([]byte(OutputGuard))
-			sendError(w, http.StatusBadGateway, "Cannot start action. Check logs for details.")
-		}
+	// ** Vast AI
+	vastai_api_key, ok := ap.env["OPS_VASTAI_API_KEY"]
+	if !ok || vastai_api_key == "" {
+		sendError(w, http.StatusBadRequest, "Vast.ai API key not found (use -p OPS_VASTAI_API_KEY api_key when creating the action.)")
 		return
 	}
+
+	vastai_instance_id, ok := ap.env["OPS_VASTAI_INSTANCE_ID"]
+	if !ok || vastai_instance_id == "" {
+		sendError(w, http.StatusBadRequest, "Vast.ai Instance ID not found (use -p OPS_VASTAI_INSTANCE_ID instance_id when creating the action.)")
+		return
+	}
+
+	sshUrl, err := ExtractSSHAddress(vastai_api_key, vastai_instance_id)
+	if err != nil {
+		sendError(w, http.StatusBadGateway, "Error connecting to Vast.ai. Check logs for details.")
+		return
+	}
+	ap.env["VASTAI_SSH_URL"] = sshUrl
+	Debug("Vast.ai SSH URL set: %s", sshUrl)
+
+	vastai_ssh_key, ok := ap.env["OPS_VASTAI_SSH_KEY"]
+	if !ok || vastai_instance_id == "" {
+		sendError(w, http.StatusBadRequest, "Vast.ai SSH key not found (use -p OPS_VASTAI_SSH_KEY ssh_key when creating the action.)")
+		return
+	}
+
+	Debug("Some dirs: base %s current %d binpath %s", ap.baseDir, ap.currentDir, binPath)
+
+	sshClient, err := ConnectSSH(sshUrl, vastai_ssh_key)
+	if err != nil {
+		sendError(w, http.StatusBadGateway, "Error connecting to Vast.ai. Make sure the instance ID and SSH key are set correctly. Check logs for details.")
+		return
+	}
+
+	err = CreateActionFoldersSSH(sshClient, binPath)
+	if err != nil {
+		sendError(w, http.StatusBadGateway, "Error creating action folder in Vast.ai. Check logs for details.")
+		return
+	}
+
+	err = ScpTransfer(sshClient, binPath)
+	if err != nil {
+		sendError(w, http.StatusBadGateway, "Error transferring action to Vast.ai. Check logs for details.")
+		return
+	}
+
+	err = UnzipRemote(sshClient, binPath)
+	if err != nil {
+		sendError(w, http.StatusBadGateway, "Error unzipping action in Vast.ai. Check logs for details.")
+		return
+	}
+	// **
+
+	// NOTE: No need to start the executor in the runtime anymore, since it will be executed in the Vast AI instance
+	// start an action
+	// err = ap.StartLatestAction()
+	// if err != nil {
+	// 	if os.Getenv("OW_LOG_INIT_ERROR") == "" {
+	// 		sendError(w, http.StatusBadGateway, "cannot start action: "+err.Error())
+	// 	} else {
+	// 		ap.errFile.Write([]byte(err.Error() + "\n"))
+	// 		ap.outFile.Write([]byte(OutputGuard))
+	// 		ap.errFile.Write([]byte(OutputGuard))
+	// 		sendError(w, http.StatusBadGateway, "Cannot start action. Check logs for details.")
+	// 	}
+	// 	return
+	// }
+
 	ap.initialized = true
 	sendOK(w)
 }

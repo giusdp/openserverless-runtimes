@@ -70,7 +70,7 @@ func NewActionProxy(baseDir string, compiler string, outFile *os.File, errFile *
 	}
 }
 
-//SetEnv sets the environment
+// SetEnv sets the environment
 func (ap *ActionProxy) SetEnv(env map[string]interface{}) {
 	// Propagate proxy version
 	ap.env["__OW_PROXY_VERSION"] = Version
@@ -103,7 +103,7 @@ func (ap *ActionProxy) SetEnv(env map[string]interface{}) {
 			ap.env[k] = string(buf)
 		}
 	}
-	Debug("init env: %s", ap.env)
+	// Debug("init env: %s", ap.env)
 }
 
 // StartLatestAction tries to start
@@ -190,9 +190,9 @@ func (ap *ActionProxy) ExtractAndCompileIO(r io.Reader, w io.Writer, main string
 
 	envMap := make(map[string]interface{})
 	if env != "" {
-	    json.Unmarshal([]byte(env), &envMap)
+		json.Unmarshal([]byte(env), &envMap)
 	}
-    ap.SetEnv(envMap)
+	ap.SetEnv(envMap)
 
 	// extract and compile it
 	file, err := ap.ExtractAndCompile(&in, main)

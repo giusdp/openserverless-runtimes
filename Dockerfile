@@ -17,10 +17,9 @@
 
 # Do not fix the patch level for golang:1.19 to automatically get security fixes.
 FROM golang:1.21
-ENV HOME=/tmp
-USER nobody
-# RUN CGO_ENABLED=0 go install github.com/giusdp/openserverless-runtimes@0.1.0-testing.2408220918
-# RUN mv /go/bin/openserverless-runtimes /go/bin/proxy
+# ENV HOME=/tmp
+# USER nobody
+WORKDIR /app
 COPY . .
 RUN go build -o proxy
-ENTRYPOINT [ "/go/bin/proxy" ]
+# ENTRYPOINT [ "/go/bin/proxy" ]
